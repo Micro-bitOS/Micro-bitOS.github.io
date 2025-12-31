@@ -1,1 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MicroOS for micro:bit</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0e27;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: absolute;
+            width: 200%;
+            height: 200%;
+            background: 
+                linear-gradient(90deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(rgba(0, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            animation: grid 20s linear infinite;
+        }
+
+        @keyframes grid {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(50px, 50px); }
+        }
+
+        .container {
+            background: #0f1429;
+            border: 2px solid #00ffff;
+            max-width: 700px;
+            width: 100%;
+            box-shadow: 0 0 40px rgba(0, 255, 255, 0.3);
+            position: relative;
+            z-index: 1;
+        }
+
+        .top-bar {
+            background: #1a1f3a;
+            border-bottom: 2px solid #00ffff;
+            display: flex;
+            position: relative;
+        }
+
+        .top-bar::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #00ffff, #00ff88, #00ffff);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .tab {
+            flex: 1;
+            padding: 20px;
+            text-align: center;
+            color: #00ffff;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-right: 1px solid rgba(0, 255, 255, 0.2);
+            position: relative;
+        }
+
+        .tab:last-child {
+            border-right: none;
+        }
+
+        .tab:hover {
+            background: rgba(0, 255, 255, 0.1);
+        }
+
+        .tab.active {
+            background: rgba(0, 255, 255, 0.2);
+            color: #00ff88;
+        }
+
+        .tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: #00ff88;
+        }
+
+        .content {
+            padding: 60px 40px;
+        }
+
+        .section {
+            display: none;
+        }
+
+        .section.active {
+            display: block;
+        }
+
+        h1 {
+            color: #00ffff;
+            font-size: 2.5em;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+            text-align: center;
+        }
+
+        .subtitle {
+            color: #00ff88;
+            font-size: 1em;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-align: center;
+            margin-bottom: 50px;
+        }
+
+        .download-btn {
+            background: transparent;
+            color: #00ffff;
+            border: 3px solid #00ffff;
+            padding: 20px 60px;
+            font-size: 1.2em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: 'Courier New', monospace;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            font-weight: bold;
+            width: 100%;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 30px;
+        }
+
+        .download-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 255, 255, 0.2);
+            transition: left 0.3s ease;
+        }
+
+        .download-btn:hover::before {
+            left: 0;
+        }
+
+        .download-btn:hover {
+            background: rgba(0, 255, 255, 0.1);
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .download-btn:active {
+            transform: translateY(0);
+        }
+
+        .download-btn:disabled {
+            border-color: #666;
+            color: #666;
+            cursor: not-allowed;
+        }
+
+        .download-btn:disabled:hover {
+            background: transparent;
+            box-shadow: none;
+            transform: none;
+        }
+
+        .status {
+            padding: 20px;
+            border-left: 4px solid;
+            font-size: 0.95em;
+            display: none;
+            background: #1a1f3a;
+        }
+
+        .status.show {
+            display: block;
+        }
+
+        .status.info {
+            border-color: #00ffff;
+            color: #00ffff;
+        }
+
+        .status.success {
+            border-color: #00ff88;
+            color: #00ff88;
+        }
+
+        .status.error {
+            border-color: #ff0055;
+            color: #ff0055;
+        }
+
+        .progress-container {
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .progress-container.show {
+            display: block;
+        }
+
+        .progress-label {
+            color: #00ffff;
+            font-size: 0.85em;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #1a1f3a;
+            border: 1px solid #00ffff;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #00ffff;
+            width: 0%;
+            transition: width 0.3s ease;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.8);
+        }
+
+        .corner-decoration {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #00ffff;
+        }
+
+        .corner-decoration.tl {
+            top: -2px;
+            left: -2px;
+            border-right: none;
+            border-bottom: none;
+        }
+
+        .corner-decoration.tr {
+            top: -2px;
+            right: -2px;
+            border-left: none;
+            border-bottom: none;
+        }
+
+        .corner-decoration.bl {
+            bottom: -2px;
+            left: -2px;
+            border-right: none;
+            border-top: none;
+        }
+
+        .corner-decoration.br {
+            bottom: -2px;
+            right: -2px;
+            border-left: none;
+            border-top: none;
+        }
+
+        .placeholder-text {
+            color: #00ffff;
+            text-align: center;
+            padding: 60px 20px;
+            font-size: 1.2em;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="corner-decoration tl"></div>
+        <div class="corner-decoration tr"></div>
+        <div class="corner-decoration bl"></div>
+        <div class="corner-decoration br"></div>
+
+        <div class="top-bar">
+            <div class="tab active" data-tab="download">Download</div>
+            <div class="tab" data-tab="update">Update</div>
+            <div class="tab" data-tab="apps">Apps</div>
+        </div>
+        
+        <div class="content">
+            <div class="section active" id="download">
+                <h1>MicroOS</h1>
+                <div class="subtitle">Micro:bit Operating System</div>
+                
+                <button class="download-btn" id="flashBtn">
+                    <span>[ FLASH DEVICE ]</span>
+                </button>
+                
+                <div class="progress-container" id="progressContainer">
+                    <div class="progress-label">FLASHING PROGRESS</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                </div>
+                
+                <div class="status" id="status"></div>
+            </div>
+
+            <div class="section" id="update">
+                <div class="placeholder-text">[ UPDATE SECTION ]<br>Coming Soon</div>
+            </div>
+
+            <div class="section" id="apps">
+                <div class="placeholder-text">[ APPS SECTION ]<br>Coming Soon</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const flashBtn = document.getElementById('flashBtn');
+        const statusDiv = document.getElementById('status');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressFill = document.getElementById('progressFill');
+        const tabs = document.querySelectorAll('.tab');
+        const sections = document.querySelectorAll('.section');
+
+        // Tab switching
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const targetTab = tab.dataset.tab;
+                
+                tabs.forEach(t => t.classList.remove('active'));
+                sections.forEach(s => s.classList.remove('active'));
+                
+                tab.classList.add('active');
+                document.getElementById(targetTab).classList.add('active');
+            });
+        });
+
+        function showStatus(message, type) {
+            statusDiv.textContent = '▶ ' + message;
+            statusDiv.className = 'status show ' + type;
+        }
+
+        function updateProgress(percent) {
+            progressFill.style.width = percent + '%';
+        }
+
+        async function flashMicrobit() {
+            if (!navigator.usb) {
+                showStatus('WEBUSB NOT SUPPORTED. USE CHROME OR EDGE BROWSER.', 'error');
+                return;
+            }
+
+            try {
+                flashBtn.disabled = true;
+                showStatus('REQUESTING MICRO:BIT CONNECTION...', 'info');
+
+                const device = await navigator.usb.requestDevice({
+                    filters: [{ vendorId: 0x0d28 }]
+                });
+
+                showStatus('CONNECTED. FETCHING HEX FILE...', 'info');
+                progressContainer.classList.add('show');
+                updateProgress(10);
+
+                const response = await fetch('/hexs/os/main.hex');
+                if (!response.ok) {
+                    throw new Error('COULD NOT LOAD HEX FILE AT /hexs/os/main.hex');
+                }
+                
+                const hexContent = await response.text();
+                updateProgress(30);
+
+                showStatus('OPENING DEVICE...', 'info');
+                
+                await device.open();
+                updateProgress(40);
+
+                if (device.configuration === null) {
+                    await device.selectConfiguration(1);
+                }
+                updateProgress(50);
+
+                await device.claimInterface(0);
+                updateProgress(60);
+
+                showStatus('FLASHING MICRO:BIT...', 'info');
+                
+                const binary = hexToBinary(hexContent);
+                updateProgress(70);
+
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                updateProgress(100);
+
+                showStatus('MICROOS SUCCESSFULLY FLASHED TO DEVICE', 'success');
+                
+                await device.close();
+
+            } catch (error) {
+                console.error('Error:', error);
+                showStatus('ERROR: ' + error.message.toUpperCase(), 'error');
+            } finally {
+                flashBtn.disabled = false;
+                setTimeout(() => {
+                    progressContainer.classList.remove('show');
+                    updateProgress(0);
+                }, 3000);
+            }
+        }
+
+        function hexToBinary(hexContent) {
+            const lines = hexContent.trim().split('\n');
+            const data = [];
+            
+            for (const line of lines) {
+                if (line.startsWith(':')) {
+                    const byteCount = parseInt(line.substr(1, 2), 16);
+                    const recordType = parseInt(line.substr(7, 2), 16);
+                    
+                    if (recordType === 0) {
+                        for (let i = 0; i < byteCount; i++) {
+                            const byte = parseInt(line.substr(9 + i * 2, 2), 16);
+                            data.push(byte);
+                        }
+                    }
+                }
+            }
+            
+            return new Uint8Array(data);
+        }
+
+        flashBtn.addEventListener('click', flashMicrobit);
+
+        if (!navigator.usb) {
+            showStatus('WEBUSB NOT SUPPORTED. PLEASE USE CHROME OR EDGE.', 'error');
+        }
+    </script>
+</body>
+</html>

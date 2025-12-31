@@ -345,7 +345,6 @@
         </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/dapjs/2.3.0/dap.umd.js"></script>
     <script>
         const flashBtn = document.getElementById('flashBtn');
         const statusDiv = document.getElementById('status');
@@ -377,22 +376,9 @@
         }
 
         async function flashMicrobit() {
-            if (!navigator.usb) {
-                showStatus('WEBUSB NOT SUPPORTED. USE CHROME OR EDGE BROWSER.', 'error');
-                return;
-            }
-
             try {
                 flashBtn.disabled = true;
-                showStatus('REQUESTING MICRO:BIT CONNECTION...', 'info');
-
-                // Use DAPjs to connect to micro:bit
-                const transport = new DAPjs.WebUSB();
-                const target = new DAPjs.DAPLink(transport);
-                
-                await target.connect();
-
-                showStatus('CONNECTED. FETCHING HEX FILE...', 'info');
+                showStatus('FETCHING HEX FILE...', 'info');
                 progressContainer.classList.add('show');
                 updateProgress(10);
 
@@ -402,25 +388,32 @@
                 }
                 
                 const hexContent = await response.text();
-                updateProgress(30);
-
-                showStatus('PREPARING FLASH...', 'info');
-                
-                // Parse hex to binary
-                const binary = hexToBinary(hexContent);
                 updateProgress(50);
 
-                showStatus('FLASHING MICRO:BIT...', 'info');
+                showStatus('PREPARING DOWNLOAD...', 'info');
                 
-                // Flash the binary
-                await target.flash(binary, (progress) => {
-                    const percent = 50 + (progress * 50);
-                    updateProgress(percent);
-                });
-
-                showStatus('MICROOS SUCCESSFULLY FLASHED TO DEVICE', 'success');
+                // Create a blob from the hex content
+                const blob = new Blob([hexContent], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
                 
-                await target.disconnect();
+                updateProgress(80);
+                
+                // Create a download link
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'microos.hex';
+                document.body.appendChild(a);
+                
+                showStatus('DOWNLOADING HEX FILE...', 'info');
+                a.click();
+                
+                updateProgress(100);
+                
+                // Clean up
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                showStatus('DOWNLOAD COMPLETE! DRAG THE .HEX FILE TO YOUR MICRO:BIT DRIVE', 'success');
 
             } catch (error) {
                 console.error('Error:', error);
@@ -430,37 +423,11 @@
                 setTimeout(() => {
                     progressContainer.classList.remove('show');
                     updateProgress(0);
-                }, 3000);
+                }, 5000);
             }
-        }
-
-        function hexToBinary(hexContent) {
-            const lines = hexContent.trim().split('\n');
-            let binary = new Uint8Array(256 * 1024); // 256KB buffer for micro:bit
-            
-            for (const line of lines) {
-                if (line.startsWith(':')) {
-                    const byteCount = parseInt(line.substr(1, 2), 16);
-                    const address = parseInt(line.substr(3, 4), 16);
-                    const recordType = parseInt(line.substr(7, 2), 16);
-                    
-                    if (recordType === 0) { // Data record
-                        for (let i = 0; i < byteCount; i++) {
-                            const byte = parseInt(line.substr(9 + i * 2, 2), 16);
-                            binary[address + i] = byte;
-                        }
-                    }
-                }
-            }
-            
-            return binary;
         }
 
         flashBtn.addEventListener('click', flashMicrobit);
-
-        if (!navigator.usb) {
-            showStatus('WEBUSB NOT SUPPORTED. PLEASE USE CHROME OR EDGE.', 'error');
-        }
     </script>
 </body>
 </html>

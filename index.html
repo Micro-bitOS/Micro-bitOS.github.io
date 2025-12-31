@@ -111,7 +111,10 @@
         }
 
         .content {
-            padding: 60px 40px;
+            padding: 40px;
+            min-height: 500px;
+            display: flex;
+            align-items: center;
         }
 
         .section {
@@ -383,66 +386,71 @@
             </div>
 
             <div class="section" id="update">
-                <h1>Update Micro OS</h1>
-                <div class="subtitle">Check for updates</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; align-items: start;">
+                    <div>
+                        <h2 style="color: #00ffff; font-size: 1.5em; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 2px;">Update App Icon</h2>
+                        <div class="info-box" style="margin-bottom: 20px;">
+                            <div class="led-grid">
+                                <div class="led"></div>
+                                <div class="led"></div>
+                                <div class="led on"></div>
+                                <div class="led"></div>
+                                <div class="led"></div>
+                                <div class="led"></div>
+                                <div class="led"></div>
+                                <div class="led on"></div>
+                                <div class="led"></div>
+                                <div class="led"></div>
+                                <div class="led"></div>
+                                <div class="led"></div>
+                                <div class="led on"></div>
+                                <div class="led"></div>
+                                <div class="led"></div>
+                                <div class="led"></div>
+                                <div class="led on"></div>
+                                <div class="led on"></div>
+                                <div class="led on"></div>
+                                <div class="led"></div>
+                                <div class="led"></div>
+                                <div class="led"></div>
+                                <div class="led on"></div>
+                                <div class="led"></div>
+                                <div class="led"></div>
+                            </div>
+                            <div class="info-text" style="margin-top: 15px; font-size: 0.75em; text-align: center;">DOWN ARROW</div>
+                        </div>
 
-                <div class="info-box" style="margin-bottom: 30px;">
-                    <div class="info-text" style="margin-bottom: 20px;">STEP 1: OPEN UPDATE APP ON MICRO:BIT</div>
-                    <div class="led-grid">
-                        <div class="led"></div>
-                        <div class="led"></div>
-                        <div class="led on"></div>
-                        <div class="led"></div>
-                        <div class="led"></div>
-                        <div class="led"></div>
-                        <div class="led"></div>
-                        <div class="led on"></div>
-                        <div class="led"></div>
-                        <div class="led"></div>
-                        <div class="led"></div>
-                        <div class="led"></div>
-                        <div class="led on"></div>
-                        <div class="led"></div>
-                        <div class="led"></div>
-                        <div class="led"></div>
-                        <div class="led"></div>
-                        <div class="led on"></div>
-                        <div class="led"></div>
-                        <div class="led"></div>
-                        <div class="led"></div>
-                        <div class="led"></div>
-                        <div class="led on"></div>
-                        <div class="led"></div>
-                        <div class="led"></div>
+                        <div class="version-info" id="versionInfo" style="display: none;">
+                            <div style="background: #1a1f3a; border: 2px solid #00ffff; padding: 15px; text-align: center;">
+                                <div style="color: #00ffff; font-size: 0.8em; margin-bottom: 8px;">CURRENT</div>
+                                <div id="currentVersion" style="color: #00ff88; font-size: 1.3em; margin-bottom: 12px;">-</div>
+                                <div style="color: #00ffff; font-size: 0.8em; margin-bottom: 8px;">LATEST</div>
+                                <div style="color: #00ff88; font-size: 1.3em;">v1</div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="info-text" style="margin-top: 20px; font-size: 0.8em;">DOWN ARROW ICON</div>
-                </div>
 
-                <button class="download-btn" id="checkVersionBtn" style="margin-bottom: 20px;">
-                    <span>[ CHECK VERSION ]</span>
-                </button>
+                    <div>
+                        <h2 style="color: #00ffff; font-size: 1.5em; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 2px;">Check & Update</h2>
+                        
+                        <button class="download-btn" id="checkVersionBtn" style="margin-bottom: 15px; padding: 15px 40px; font-size: 1em;">
+                            <span>[ CHECK VERSION ]</span>
+                        </button>
 
-                <div class="version-info" id="versionInfo" style="display: none; margin-bottom: 20px;">
-                    <div style="background: #1a1f3a; border: 2px solid #00ffff; padding: 20px; text-align: center;">
-                        <div style="color: #00ffff; font-size: 0.9em; margin-bottom: 10px;">CURRENT VERSION</div>
-                        <div id="currentVersion" style="color: #00ff88; font-size: 1.5em; margin-bottom: 15px;">-</div>
-                        <div style="color: #00ffff; font-size: 0.9em; margin-bottom: 10px;">LATEST VERSION</div>
-                        <div style="color: #00ff88; font-size: 1.5em;">v1</div>
+                        <button class="download-btn" id="updateBtn" style="display: none; margin-bottom: 15px; padding: 15px 40px; font-size: 1em;">
+                            <span>[ UPDATE NOW ]</span>
+                        </button>
+
+                        <div class="progress-container" id="updateProgressContainer">
+                            <div class="progress-label">PROGRESS</div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="updateProgressFill"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="status" id="updateStatus"></div>
                     </div>
                 </div>
-
-                <button class="download-btn" id="updateBtn" style="display: none;">
-                    <span>[ UPDATE MICRO OS ]</span>
-                </button>
-
-                <div class="progress-container" id="updateProgressContainer">
-                    <div class="progress-label">UPDATE PROGRESS</div>
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="updateProgressFill"></div>
-                    </div>
-                </div>
-                
-                <div class="status" id="updateStatus"></div>
             </div>
 
             <div class="section" id="apps">

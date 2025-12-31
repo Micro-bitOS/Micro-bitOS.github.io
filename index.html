@@ -318,7 +318,7 @@
         
         <div class="content">
             <div class="section active" id="download">
-                <h1>MicroOS</h1>
+                <h1>Micro OS</h1>
                 <div class="subtitle">Micro:bit Operating System</div>
                 
                 <button class="download-btn" id="flashBtn">
@@ -345,13 +345,17 @@
         </div>
     </div>
 
-    <script>
+    <script type="module">
+        import { createWebUSBConnection, createUniversalHexFlashDataSource } from 'https://cdn.jsdelivr.net/npm/@microbit/microbit-connection@0.0.0-alpha.39/+esm';
+
         const flashBtn = document.getElementById('flashBtn');
         const statusDiv = document.getElementById('status');
         const progressContainer = document.getElementById('progressContainer');
         const progressFill = document.getElementById('progressFill');
         const tabs = document.querySelectorAll('.tab');
         const sections = document.querySelectorAll('.section');
+
+        let usb = null;
 
         // Tab switching
         tabs.forEach(tab => {
@@ -378,7 +382,21 @@
         async function flashMicrobit() {
             try {
                 flashBtn.disabled = true;
-                showStatus('FETCHING HEX FILE...', 'info');
+                showStatus('REQUESTING MICRO:BIT CONNECTION...', 'info');
+
+                // Create WebUSB connection
+                if (!usb) {
+                    usb = createWebUSBConnection();
+                }
+
+                // Connect to micro:bit
+                const connectionStatus = await usb.connect();
+                
+                if (connectionStatus !== 'CONNECTED') {
+                    throw new Error('FAILED TO CONNECT TO MICRO:BIT');
+                }
+
+                showStatus('CONNECTED. FETCHING HEX FILE...', 'info');
                 progressContainer.classList.add('show');
                 updateProgress(10);
 
@@ -388,32 +406,23 @@
                 }
                 
                 const hexContent = await response.text();
-                updateProgress(50);
+                updateProgress(30);
 
-                showStatus('PREPARING DOWNLOAD...', 'info');
+                showStatus('FLASHING MICRO:BIT...', 'info');
                 
-                // Create a blob from the hex content
-                const blob = new Blob([hexContent], { type: 'text/plain' });
-                const url = URL.createObjectURL(blob);
-                
-                updateProgress(80);
-                
-                // Create a download link
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'microos.hex';
-                document.body.appendChild(a);
-                
-                showStatus('DOWNLOADING HEX FILE...', 'info');
-                a.click();
-                
+                // Flash the hex file with progress tracking
+                await usb.flash(createUniversalHexFlashDataSource(hexContent), {
+                    partial: false,
+                    progress: (percentage) => {
+                        if (percentage !== undefined) {
+                            const progressPercent = 30 + (percentage * 0.7);
+                            updateProgress(progressPercent);
+                        }
+                    }
+                });
+
                 updateProgress(100);
-                
-                // Clean up
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                
-                showStatus('DOWNLOAD COMPLETE! DRAG THE .HEX FILE TO YOUR MICRO:BIT DRIVE', 'success');
+                showStatus('MICROOS SUCCESSFULLY FLASHED TO DEVICE', 'success');
 
             } catch (error) {
                 console.error('Error:', error);
@@ -423,11 +432,16 @@
                 setTimeout(() => {
                     progressContainer.classList.remove('show');
                     updateProgress(0);
-                }, 5000);
+                }, 3000);
             }
         }
 
         flashBtn.addEventListener('click', flashMicrobit);
+
+        // Check WebUSB support
+        if (!navigator.usb) {
+            showStatus('WEBUSB NOT SUPPORTED. PLEASE USE CHROME OR EDGE.', 'error');
+        }
     </script>
 </body>
 </html>

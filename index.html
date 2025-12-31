@@ -292,6 +292,53 @@
             border-top: none;
         }
 
+        .led-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            width: 150px;
+            margin: 0 auto;
+            padding: 15px;
+            background: #000;
+            border: 2px solid #00ffff;
+        }
+
+        .led {
+            width: 100%;
+            aspect-ratio: 1;
+            background: #1a1f3a;
+            border: 1px solid #00ffff;
+        }
+
+        .led.on {
+            background: #00ffff;
+            box-shadow: 0 0 10px #00ffff;
+        }
+
+        .info-box {
+            border: 2px solid #00ffff;
+            background: #1a1f3a;
+        }
+
+        .info-text {
+            color: #00ffff;
+        }
+
+        .version-info {
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
         .placeholder-text {
             color: #00ffff;
             text-align: center;
@@ -336,7 +383,66 @@
             </div>
 
             <div class="section" id="update">
-                <div class="placeholder-text">[ UPDATE SECTION ]<br>Coming Soon</div>
+                <h1>Update Micro OS</h1>
+                <div class="subtitle">Check for updates</div>
+
+                <div class="info-box" style="margin-bottom: 30px;">
+                    <div class="info-text" style="margin-bottom: 20px;">STEP 1: OPEN UPDATE APP ON MICRO:BIT</div>
+                    <div class="led-grid">
+                        <div class="led"></div>
+                        <div class="led"></div>
+                        <div class="led on"></div>
+                        <div class="led"></div>
+                        <div class="led"></div>
+                        <div class="led"></div>
+                        <div class="led"></div>
+                        <div class="led on"></div>
+                        <div class="led"></div>
+                        <div class="led"></div>
+                        <div class="led"></div>
+                        <div class="led"></div>
+                        <div class="led on"></div>
+                        <div class="led"></div>
+                        <div class="led"></div>
+                        <div class="led"></div>
+                        <div class="led"></div>
+                        <div class="led on"></div>
+                        <div class="led"></div>
+                        <div class="led"></div>
+                        <div class="led"></div>
+                        <div class="led"></div>
+                        <div class="led on"></div>
+                        <div class="led"></div>
+                        <div class="led"></div>
+                    </div>
+                    <div class="info-text" style="margin-top: 20px; font-size: 0.8em;">DOWN ARROW ICON</div>
+                </div>
+
+                <button class="download-btn" id="checkVersionBtn" style="margin-bottom: 20px;">
+                    <span>[ CHECK VERSION ]</span>
+                </button>
+
+                <div class="version-info" id="versionInfo" style="display: none; margin-bottom: 20px;">
+                    <div style="background: #1a1f3a; border: 2px solid #00ffff; padding: 20px; text-align: center;">
+                        <div style="color: #00ffff; font-size: 0.9em; margin-bottom: 10px;">CURRENT VERSION</div>
+                        <div id="currentVersion" style="color: #00ff88; font-size: 1.5em; margin-bottom: 15px;">-</div>
+                        <div style="color: #00ffff; font-size: 0.9em; margin-bottom: 10px;">LATEST VERSION</div>
+                        <div style="color: #00ff88; font-size: 1.5em;">v1</div>
+                    </div>
+                </div>
+
+                <button class="download-btn" id="updateBtn" style="display: none;">
+                    <span>[ UPDATE MICRO OS ]</span>
+                </button>
+
+                <div class="progress-container" id="updateProgressContainer">
+                    <div class="progress-label">UPDATE PROGRESS</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="updateProgressFill"></div>
+                    </div>
+                </div>
+                
+                <div class="status" id="updateStatus"></div>
             </div>
 
             <div class="section" id="apps">
@@ -354,8 +460,19 @@
         const progressFill = document.getElementById('progressFill');
         const tabs = document.querySelectorAll('.tab');
         const sections = document.querySelectorAll('.section');
+        
+        // Update section elements
+        const checkVersionBtn = document.getElementById('checkVersionBtn');
+        const updateBtn = document.getElementById('updateBtn');
+        const versionInfo = document.getElementById('versionInfo');
+        const currentVersion = document.getElementById('currentVersion');
+        const updateStatus = document.getElementById('updateStatus');
+        const updateProgressContainer = document.getElementById('updateProgressContainer');
+        const updateProgressFill = document.getElementById('updateProgressFill');
 
         let usb = null;
+        let serialPort = null;
+        const LATEST_VERSION = 'v1';
 
         // Tab switching
         tabs.forEach(tab => {
@@ -375,8 +492,178 @@
             statusDiv.className = 'status show ' + type;
         }
 
+        function showUpdateStatus(message, type) {
+            updateStatus.textContent = '▶ ' + message;
+            updateStatus.className = 'status show ' + type;
+        }
+
         function updateProgress(percent) {
             progressFill.style.width = percent + '%';
+        }
+
+        function updateUpdateProgress(percent) {
+            updateProgressFill.style.width = percent + '%';
+        }
+
+        async function checkVersion() {
+            try {
+                checkVersionBtn.disabled = true;
+                showUpdateStatus('CONNECTING TO MICRO:BIT VIA SERIAL...', 'info');
+
+                // Request serial port
+                serialPort = await navigator.serial.requestPort({
+                    filters: [{ usbVendorId: 0x0d28 }]
+                });
+
+                await serialPort.open({ baudRate: 115200 });
+                showUpdateStatus('CONNECTED. READING VERSION...', 'info');
+
+                const reader = serialPort.readable.getReader();
+                let receivedData = '';
+                let timeout;
+
+                // Read version data with timeout
+                const readPromise = new Promise((resolve, reject) => {
+                    timeout = setTimeout(() => {
+                        reader.releaseLock();
+                        reject(new Error('TIMEOUT: NO VERSION DATA RECEIVED'));
+                    }, 5000);
+
+                    const readLoop = async () => {
+                        try {
+                            while (true) {
+                                const { value, done } = await reader.read();
+                                if (done) break;
+                                
+                                const text = new TextDecoder().decode(value);
+                                receivedData += text;
+                                
+                                // Check if we received version data (e.g., "v1" or "v0.1")
+                                const versionMatch = receivedData.match(/v\d+(\.\d+)?/);
+                                if (versionMatch) {
+                                    clearTimeout(timeout);
+                                    reader.releaseLock();
+                                    resolve(versionMatch[0]);
+                                    break;
+                                }
+                            }
+                        } catch (error) {
+                            clearTimeout(timeout);
+                            reader.releaseLock();
+                            reject(error);
+                        }
+                    };
+                    readLoop();
+                });
+
+                const version = await readPromise;
+                
+                // Close serial port
+                await serialPort.close();
+                serialPort = null;
+
+                // Display version info
+                currentVersion.textContent = version;
+                versionInfo.style.display = 'block';
+
+                // Parse versions for comparison
+                const parseVersion = (v) => {
+                    const nums = v.replace('v', '').split('.').map(n => parseInt(n) || 0);
+                    return { major: nums[0] || 0, minor: nums[1] || 0, patch: nums[2] || 0 };
+                };
+
+                const current = parseVersion(version);
+                const latest = parseVersion(LATEST_VERSION);
+
+                // Compare versions
+                if (current.major > latest.major || 
+                    (current.major === latest.major && current.minor > latest.minor) ||
+                    (current.major === latest.major && current.minor === latest.minor && current.patch > latest.patch)) {
+                    // Newer version
+                    showUpdateStatus(`YOU HAVE A NEWER VERSION (${version}) THAN THIS SITE (${LATEST_VERSION}). DO NOT UPDATE UNLESS YOU WANT TO DOWNGRADE.`, 'error');
+                    updateBtn.style.display = 'none';
+                } else if (current.major === latest.major && current.minor === latest.minor && current.patch === latest.patch) {
+                    // Same version
+                    showUpdateStatus(`YOUR MICRO OS IS UP TO DATE (${version})`, 'success');
+                    updateBtn.style.display = 'none';
+                } else {
+                    // Older version
+                    showUpdateStatus(`YOUR INSTANCE OF MICRO OS IS ${version}. IT IS RECOMMENDED TO UPDATE TO ${LATEST_VERSION}.`, 'info');
+                    updateBtn.style.display = 'block';
+                }
+
+            } catch (error) {
+                console.error('Error:', error);
+                showUpdateStatus('ERROR: ' + error.message.toUpperCase(), 'error');
+                if (serialPort) {
+                    try {
+                        await serialPort.close();
+                    } catch (e) {}
+                    serialPort = null;
+                }
+            } finally {
+                checkVersionBtn.disabled = false;
+            }
+        }
+
+        async function updateMicroOS() {
+            try {
+                updateBtn.disabled = true;
+                showUpdateStatus('STARTING UPDATE...', 'info');
+                updateProgressContainer.classList.add('show');
+                updateUpdateProgress(10);
+
+                // Create WebUSB connection
+                if (!usb) {
+                    usb = createWebUSBConnection();
+                }
+
+                // Connect to micro:bit
+                const connectionStatus = await usb.connect();
+                
+                if (connectionStatus !== 'CONNECTED') {
+                    throw new Error('FAILED TO CONNECT TO MICRO:BIT');
+                }
+
+                showUpdateStatus('CONNECTED. FETCHING UPDATE...', 'info');
+                updateUpdateProgress(30);
+
+                const response = await fetch('/hexs/os/main.hex');
+                if (!response.ok) {
+                    throw new Error('COULD NOT LOAD UPDATE FILE');
+                }
+                
+                const hexContent = await response.text();
+                updateUpdateProgress(40);
+
+                showUpdateStatus('FLASHING UPDATE...', 'info');
+                
+                // Flash the hex file with progress tracking
+                await usb.flash(createUniversalHexFlashDataSource(hexContent), {
+                    partial: false,
+                    progress: (percentage) => {
+                        if (percentage !== undefined) {
+                            const progressPercent = 40 + (percentage * 0.6);
+                            updateUpdateProgress(progressPercent);
+                        }
+                    }
+                });
+
+                updateUpdateProgress(100);
+                currentVersion.textContent = LATEST_VERSION;
+                showUpdateStatus('UPDATE COMPLETE! MICRO OS ' + LATEST_VERSION + ' INSTALLED', 'success');
+                updateBtn.style.display = 'none';
+
+            } catch (error) {
+                console.error('Error:', error);
+                showUpdateStatus('ERROR: ' + error.message.toUpperCase(), 'error');
+            } finally {
+                updateBtn.disabled = false;
+                setTimeout(() => {
+                    updateProgressContainer.classList.remove('show');
+                    updateUpdateProgress(0);
+                }, 3000);
+            }
         }
 
         async function flashMicrobit() {
@@ -422,7 +709,7 @@
                 });
 
                 updateProgress(100);
-                showStatus('MICROOS SUCCESSFULLY FLASHED TO DEVICE', 'success');
+                showStatus('MICRO OS SUCCESSFULLY FLASHED TO DEVICE', 'success');
 
             } catch (error) {
                 console.error('Error:', error);
@@ -437,10 +724,17 @@
         }
 
         flashBtn.addEventListener('click', flashMicrobit);
+        checkVersionBtn.addEventListener('click', checkVersion);
+        updateBtn.addEventListener('click', updateMicroOS);
 
         // Check WebUSB support
         if (!navigator.usb) {
             showStatus('WEBUSB NOT SUPPORTED. PLEASE USE CHROME OR EDGE.', 'error');
+        }
+
+        // Check Web Serial support
+        if (!navigator.serial) {
+            showUpdateStatus('WEB SERIAL NOT SUPPORTED. PLEASE USE CHROME OR EDGE.', 'error');
         }
     </script>
 </body>

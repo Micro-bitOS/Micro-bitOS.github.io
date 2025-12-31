@@ -345,6 +345,7 @@
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dapjs/2.3.0/dap.umd.js"></script>
     <script>
         const flashBtn = document.getElementById('flashBtn');
         const statusDiv = document.getElementById('status');
@@ -385,9 +386,11 @@
                 flashBtn.disabled = true;
                 showStatus('REQUESTING MICRO:BIT CONNECTION...', 'info');
 
-                const device = await navigator.usb.requestDevice({
-                    filters: [{ vendorId: 0x0d28 }]
-                });
+                // Use DAPjs to connect to micro:bit
+                const transport = new DAPjs.WebUSB();
+                const target = new DAPjs.DAPLink(transport);
+                
+                await target.connect();
 
                 showStatus('CONNECTED. FETCHING HEX FILE...', 'info');
                 progressContainer.classList.add('show');
@@ -401,30 +404,23 @@
                 const hexContent = await response.text();
                 updateProgress(30);
 
-                showStatus('OPENING DEVICE...', 'info');
+                showStatus('PREPARING FLASH...', 'info');
                 
-                await device.open();
-                updateProgress(40);
-
-                if (device.configuration === null) {
-                    await device.selectConfiguration(1);
-                }
+                // Parse hex to binary
+                const binary = hexToBinary(hexContent);
                 updateProgress(50);
-
-                await device.claimInterface(0);
-                updateProgress(60);
 
                 showStatus('FLASHING MICRO:BIT...', 'info');
                 
-                const binary = hexToBinary(hexContent);
-                updateProgress(70);
-
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                updateProgress(100);
+                // Flash the binary
+                await target.flash(binary, (progress) => {
+                    const percent = 50 + (progress * 50);
+                    updateProgress(percent);
+                });
 
                 showStatus('MICROOS SUCCESSFULLY FLASHED TO DEVICE', 'success');
                 
-                await device.close();
+                await target.disconnect();
 
             } catch (error) {
                 console.error('Error:', error);
@@ -440,23 +436,24 @@
 
         function hexToBinary(hexContent) {
             const lines = hexContent.trim().split('\n');
-            const data = [];
+            let binary = new Uint8Array(256 * 1024); // 256KB buffer for micro:bit
             
             for (const line of lines) {
                 if (line.startsWith(':')) {
                     const byteCount = parseInt(line.substr(1, 2), 16);
+                    const address = parseInt(line.substr(3, 4), 16);
                     const recordType = parseInt(line.substr(7, 2), 16);
                     
-                    if (recordType === 0) {
+                    if (recordType === 0) { // Data record
                         for (let i = 0; i < byteCount; i++) {
                             const byte = parseInt(line.substr(9 + i * 2, 2), 16);
-                            data.push(byte);
+                            binary[address + i] = byte;
                         }
                     }
                 }
             }
             
-            return new Uint8Array(data);
+            return binary;
         }
 
         flashBtn.addEventListener('click', flashMicrobit);

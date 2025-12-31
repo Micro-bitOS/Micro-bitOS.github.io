@@ -425,7 +425,7 @@
                                 <div style="color: #00ffff; font-size: 0.8em; margin-bottom: 8px;">CURRENT</div>
                                 <div id="currentVersion" style="color: #00ff88; font-size: 1.3em; margin-bottom: 12px;">-</div>
                                 <div style="color: #00ffff; font-size: 0.8em; margin-bottom: 8px;">LATEST</div>
-                                <div style="color: #00ff88; font-size: 1.3em;">v1</div>
+                                <div style="color: #00ff88; font-size: 1.3em;">v2</div>
                             </div>
                         </div>
                     </div>
@@ -480,7 +480,7 @@
 
         let usb = null;
         let serialPort = null;
-        const LATEST_VERSION = 'v1';
+        const LATEST_VERSION = 'v2';
 
         // Tab switching
         tabs.forEach(tab => {
@@ -546,7 +546,7 @@
                                 const text = new TextDecoder().decode(value);
                                 receivedData += text;
                                 
-                                // Check if we received version data (e.g., "v1" or "v0.1")
+                                // Check if we received version data (e.g., "v2" or "v0.1")
                                 const versionMatch = receivedData.match(/v\d+(\.\d+)?/);
                                 if (versionMatch) {
                                     clearTimeout(timeout);
@@ -565,10 +565,6 @@
                 });
 
                 const version = await readPromise;
-                
-                // Close serial port
-                await serialPort.close();
-                serialPort = null;
 
                 // Display version info
                 currentVersion.textContent = version;
@@ -583,22 +579,35 @@
                 const current = parseVersion(version);
                 const latest = parseVersion(LATEST_VERSION);
 
-                // Compare versions
+                // Prepare to send response
+                const writer = serialPort.writable.getWriter();
+                const encoder = new TextEncoder();
+
+                // Compare versions and send response
                 if (current.major > latest.major || 
                     (current.major === latest.major && current.minor > latest.minor) ||
                     (current.major === latest.major && current.minor === latest.minor && current.patch > latest.patch)) {
-                    // Newer version
+                    // Newer version - send "ok"
+                    await writer.write(encoder.encode('ok\n'));
                     showUpdateStatus(`YOU HAVE A NEWER VERSION (${version}) THAN THIS SITE (${LATEST_VERSION}). DO NOT UPDATE UNLESS YOU WANT TO DOWNGRADE.`, 'error');
                     updateBtn.style.display = 'none';
                 } else if (current.major === latest.major && current.minor === latest.minor && current.patch === latest.patch) {
-                    // Same version
+                    // Same version - send "ok"
+                    await writer.write(encoder.encode('ok\n'));
                     showUpdateStatus(`YOUR MICRO OS IS UP TO DATE (${version})`, 'success');
                     updateBtn.style.display = 'none';
                 } else {
-                    // Older version
+                    // Older version - send "fail"
+                    await writer.write(encoder.encode('fail\n'));
                     showUpdateStatus(`YOUR INSTANCE OF MICRO OS IS ${version}. IT IS RECOMMENDED TO UPDATE TO ${LATEST_VERSION}.`, 'info');
                     updateBtn.style.display = 'block';
                 }
+
+                writer.releaseLock();
+                
+                // Close serial port
+                await serialPort.close();
+                serialPort = null;
 
             } catch (error) {
                 console.error('Error:', error);

@@ -591,6 +591,9 @@
                 const current = parseVersion(version);
                 const latest = parseVersion(LATEST_VERSION);
 
+                // Wait a second before sending response
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
                 // Prepare to send response
                 const writer = serialPort.writable.getWriter();
                 const encoder = new TextEncoder();

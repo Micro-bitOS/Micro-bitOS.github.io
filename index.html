@@ -465,7 +465,7 @@
                                 <div style="color: #00ffff; font-size: 0.8em; margin-bottom: 8px;">CURRENT</div>
                                 <div id="currentVersion" style="color: #00ff88; font-size: 1.3em; margin-bottom: 12px;">-</div>
                                 <div style="color: #00ffff; font-size: 0.8em; margin-bottom: 8px;">LATEST</div>
-                                <div style="color: #00ff88; font-size: 1.3em;">v2</div>
+                                <div style="color: #00ff88; font-size: 1.3em;">v3</div>
                             </div>
                         </div>
                     </div>
@@ -532,7 +532,7 @@
         let bluetoothDevice = null;
         let bluetoothCharacteristic = null;
         let isConnected = false;
-        const LATEST_VERSION = 'v2';
+        const LATEST_VERSION = 'v3';
 
         // Tab switching
         tabs.forEach(tab => {
@@ -572,7 +572,9 @@
 
         // micro:bit Bluetooth UART Service UUIDs
         const UART_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+        // TX from micro:bit's perspective (micro:bit transmits, we receive)
         const UART_TX_CHARACTERISTIC_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
+        // RX from micro:bit's perspective (micro:bit receives, we transmit)
         const UART_RX_CHARACTERISTIC_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
         
         // Alternative: micro:bit's own UART service (try this if above fails)
@@ -583,31 +585,29 @@
                 connectBtn.disabled = true;
                 showConnectStatus('REQUESTING BLUETOOTH DEVICE...', 'info');
 
-                // Request micro:bit device with proper filters
+                // Request micro:bit device
                 bluetoothDevice = await navigator.bluetooth.requestDevice({
-                    filters: [
-                        { namePrefix: 'BBC micro:bit' },
-                        { services: [UART_SERVICE_UUID] }
-                    ],
+                    filters: [{ namePrefix: 'BBC micro:bit' }],
                     optionalServices: [UART_SERVICE_UUID]
                 });
 
                 showConnectStatus('DEVICE SELECTED. CONNECTING...', 'info');
-                
-                // Add delay before connecting
-                await new Promise(resolve => setTimeout(resolve, 500));
-                
                 const server = await bluetoothDevice.gatt.connect();
                 
-                showConnectStatus('CONNECTED. GETTING SERVICE...', 'info');
+                showConnectStatus('CONNECTED. GETTING UART SERVICE...', 'info');
                 const service = await server.getPrimaryService(UART_SERVICE_UUID);
                 
-                showConnectStatus('SERVICE FOUND. SETTING UP NOTIFICATIONS...', 'info');
-                bluetoothCharacteristic = await service.getCharacteristic(UART_RX_CHARACTERISTIC_UUID);
+                showConnectStatus('SERVICE FOUND. GETTING TX CHARACTERISTIC...', 'info');
+                // Get TX characteristic (micro:bit transmits, we receive - this one notifies us)
+                const txCharacteristic = await service.getCharacteristic(UART_TX_CHARACTERISTIC_UUID);
 
-                // Start listening for notifications
-                await bluetoothCharacteristic.startNotifications();
-                bluetoothCharacteristic.addEventListener('characteristicvaluechanged', handleBluetoothData);
+                // Start listening for notifications from micro:bit
+                await txCharacteristic.startNotifications();
+                txCharacteristic.addEventListener('characteristicvaluechanged', handleBluetoothData);
+
+                // Store the service for later use when we need to write back
+                bluetoothCharacteristic = txCharacteristic;
+                bluetoothCharacteristic.service = service;
 
                 // Handle disconnect
                 bluetoothDevice.addEventListener('gattserverdisconnected', handleDisconnect);
@@ -625,9 +625,11 @@
                 let errorMsg = 'ERROR: ';
                 
                 if (error.name === 'NetworkError') {
-                    errorMsg += 'CONNECTION FAILED. TRY: 1) RESET YOUR MICRO:BIT 2) MAKE SURE BLUETOOTH UART SERVICE IS RUNNING 3) TRY AGAIN';
+                    errorMsg += 'CONNECTION FAILED. MAKE SURE: 1) BLUETOOTH UART SERVICE IS RUNNING ON MICRO:BIT 2) "NO PAIRING REQUIRED" IS ENABLED IN PROJECT SETTINGS';
                 } else if (error.name === 'NotFoundError') {
-                    errorMsg += 'NO MICRO:BIT FOUND. MAKE SURE BLUETOOTH IS ENABLED ON YOUR MICRO:BIT';
+                    errorMsg += 'UART SERVICE NOT FOUND. DID YOU ENABLE BLUETOOTH UART SERVICE?';
+                } else if (error.name === 'SecurityError') {
+                    errorMsg += 'BLUETOOTH NOT ALLOWED. MAKE SURE YOU ARE ON HTTPS OR LOCALHOST';
                 } else {
                     errorMsg += error.message.toUpperCase();
                 }
@@ -664,7 +666,7 @@
 
             console.log('Received:', receivedText);
 
-            // Check if it's a version message (e.g., "v2" or "v0.1")
+            // Check if it's a version message (e.g., "v3" or "v0.1")
             const versionMatch = receivedText.match(/v\d+(\.\d+)?/);
             if (versionMatch) {
                 const version = versionMatch[0];
@@ -679,15 +681,15 @@
                 const current = parseVersion(version);
                 const latest = parseVersion(LATEST_VERSION);
 
-                // Send response back to micro:bit
-                const txCharacteristic = await bluetoothCharacteristic.service.getCharacteristic(UART_TX_CHARACTERISTIC_UUID);
+                // Get RX characteristic to send data back to micro:bit
+                const rxCharacteristic = await bluetoothCharacteristic.service.getCharacteristic(UART_RX_CHARACTERISTIC_UUID);
                 const encoder = new TextEncoder();
 
                 if (current.major < latest.major || 
                     (current.major === latest.major && current.minor < latest.minor) ||
                     (current.major === latest.major && current.minor === latest.minor && current.patch < latest.patch)) {
                     // Older version - notify update needed
-                    await txCharacteristic.writeValue(encoder.encode('update needed\n'));
+                    await rxCharacteristic.writeValue(encoder.encode('update needed\n'));
                     btUpdateStatus.textContent = 'UPDATE AVAILABLE';
                     btUpdateStatus.style.color = '#ffaa00';
                     showConnectStatus(`VERSION ${version} DETECTED. UPDATE TO ${LATEST_VERSION} RECOMMENDED`, 'info');
@@ -745,7 +747,7 @@
                                 const text = new TextDecoder().decode(value);
                                 receivedData += text;
                                 
-                                // Check if we received version data (e.g., "v2" or "v0.1")
+                                // Check if we received version data (e.g., "v3" or "v0.1")
                                 const versionMatch = receivedData.match(/v\d+(\.\d+)?/);
                                 if (versionMatch) {
                                     clearTimeout(timeout);

@@ -362,6 +362,7 @@
 
         <div class="top-bar">
             <div class="tab active" data-tab="download">Download</div>
+            <div class="tab" data-tab="connect">Constant Connect</div>
             <div class="tab" data-tab="update">Update</div>
             <div class="tab" data-tab="apps">Apps</div>
         </div>
@@ -383,6 +384,45 @@
                 </div>
                 
                 <div class="status" id="status"></div>
+            </div>
+
+            <div class="section" id="connect">
+                <div style="width: 100%;">
+                    <h1>Constant Connect</h1>
+                    <div class="subtitle">MicroOS WiFi via Bluetooth</div>
+                    
+                    <div style="background: #1a1f3a; border: 2px solid #00ffff; padding: 20px; margin-bottom: 20px;">
+                        <div style="color: #00ffff; font-size: 0.9em; line-height: 1.6; margin-bottom: 15px;">
+                            Connect your micro:bit via Bluetooth to enable constant communication. 
+                            The site will automatically check for version updates and notify you when available.
+                        </div>
+                    </div>
+
+                    <button class="download-btn" id="connectBtn" style="margin-bottom: 15px; padding: 15px 40px; font-size: 1em;">
+                        <span>[ CONNECT BLUETOOTH ]</span>
+                    </button>
+
+                    <button class="download-btn" id="disconnectBtn" style="display: none; margin-bottom: 15px; padding: 15px 40px; font-size: 1em; border-color: #ff0055; color: #ff0055;">
+                        <span>[ DISCONNECT ]</span>
+                    </button>
+
+                    <div style="background: #1a1f3a; border: 2px solid #00ffff; padding: 20px; display: none;" id="connectionInfo">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <div style="color: #00ffff; font-size: 0.9em;">CONNECTION STATUS:</div>
+                            <div id="connectionStatus" style="color: #00ff88; font-size: 0.9em; font-weight: bold;">CONNECTED</div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <div style="color: #00ffff; font-size: 0.9em;">CURRENT VERSION:</div>
+                            <div id="btCurrentVersion" style="color: #00ff88; font-size: 0.9em; font-weight: bold;">-</div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div style="color: #00ffff; font-size: 0.9em;">UPDATE STATUS:</div>
+                            <div id="btUpdateStatus" style="color: #00ff88; font-size: 0.9em; font-weight: bold;">UP TO DATE</div>
+                        </div>
+                    </div>
+
+                    <div class="status" id="connectStatus"></div>
+                </div>
             </div>
 
             <div class="section" id="update">
@@ -425,7 +465,7 @@
                                 <div style="color: #00ffff; font-size: 0.8em; margin-bottom: 8px;">CURRENT</div>
                                 <div id="currentVersion" style="color: #00ff88; font-size: 1.3em; margin-bottom: 12px;">-</div>
                                 <div style="color: #00ffff; font-size: 0.8em; margin-bottom: 8px;">LATEST</div>
-                                <div style="color: #00ff88; font-size: 1.3em;">v3</div>
+                                <div style="color: #00ff88; font-size: 1.3em;">v2</div>
                             </div>
                         </div>
                     </div>
@@ -478,9 +518,21 @@
         const updateProgressContainer = document.getElementById('updateProgressContainer');
         const updateProgressFill = document.getElementById('updateProgressFill');
 
+        // Constant Connect elements
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const connectionInfo = document.getElementById('connectionInfo');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const btCurrentVersion = document.getElementById('btCurrentVersion');
+        const btUpdateStatus = document.getElementById('btUpdateStatus');
+        const connectStatus = document.getElementById('connectStatus');
+
         let usb = null;
         let serialPort = null;
-        const LATEST_VERSION = 'v3';
+        let bluetoothDevice = null;
+        let bluetoothCharacteristic = null;
+        let isConnected = false;
+        const LATEST_VERSION = 'v2';
 
         // Tab switching
         tabs.forEach(tab => {
@@ -505,12 +557,123 @@
             updateStatus.className = 'status show ' + type;
         }
 
+        function showConnectStatus(message, type) {
+            connectStatus.textContent = '▶ ' + message;
+            connectStatus.className = 'status show ' + type;
+        }
+
         function updateProgress(percent) {
             progressFill.style.width = percent + '%';
         }
 
         function updateUpdateProgress(percent) {
             updateProgressFill.style.width = percent + '%';
+        }
+
+        // Bluetooth UART Service UUID (standard Nordic UART Service)
+        const UART_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+        const UART_TX_CHARACTERISTIC_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
+        const UART_RX_CHARACTERISTIC_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+
+        async function connectBluetooth() {
+            try {
+                connectBtn.disabled = true;
+                showConnectStatus('REQUESTING BLUETOOTH DEVICE...', 'info');
+
+                // Request micro:bit device
+                bluetoothDevice = await navigator.bluetooth.requestDevice({
+                    filters: [{ namePrefix: 'BBC micro:bit' }],
+                    optionalServices: [UART_SERVICE_UUID]
+                });
+
+                showConnectStatus('CONNECTING...', 'info');
+                const server = await bluetoothDevice.gatt.connect();
+                const service = await server.getPrimaryService(UART_SERVICE_UUID);
+                bluetoothCharacteristic = await service.getCharacteristic(UART_RX_CHARACTERISTIC_UUID);
+
+                // Start listening for notifications
+                await bluetoothCharacteristic.startNotifications();
+                bluetoothCharacteristic.addEventListener('characteristicvaluechanged', handleBluetoothData);
+
+                // Handle disconnect
+                bluetoothDevice.addEventListener('gattserverdisconnected', handleDisconnect);
+
+                isConnected = true;
+                connectBtn.style.display = 'none';
+                disconnectBtn.style.display = 'block';
+                connectionInfo.style.display = 'block';
+                connectionStatus.textContent = 'CONNECTED';
+                connectionStatus.style.color = '#00ff88';
+                showConnectStatus('BLUETOOTH CONNECTED. LISTENING FOR VERSION DATA...', 'success');
+
+            } catch (error) {
+                console.error('Bluetooth error:', error);
+                showConnectStatus('ERROR: ' + error.message.toUpperCase(), 'error');
+                connectBtn.disabled = false;
+            }
+        }
+
+        async function disconnectBluetooth() {
+            if (bluetoothDevice && bluetoothDevice.gatt.connected) {
+                await bluetoothDevice.gatt.disconnect();
+            }
+            handleDisconnect();
+        }
+
+        function handleDisconnect() {
+            isConnected = false;
+            connectBtn.style.display = 'block';
+            connectBtn.disabled = false;
+            disconnectBtn.style.display = 'none';
+            connectionInfo.style.display = 'none';
+            connectionStatus.textContent = 'DISCONNECTED';
+            connectionStatus.style.color = '#ff0055';
+            btCurrentVersion.textContent = '-';
+            btUpdateStatus.textContent = '-';
+            showConnectStatus('BLUETOOTH DISCONNECTED', 'info');
+        }
+
+        async function handleBluetoothData(event) {
+            const value = event.target.value;
+            const textDecoder = new TextDecoder();
+            const receivedText = textDecoder.decode(value).trim();
+
+            console.log('Received:', receivedText);
+
+            // Check if it's a version message (e.g., "v2" or "v0.1")
+            const versionMatch = receivedText.match(/v\d+(\.\d+)?/);
+            if (versionMatch) {
+                const version = versionMatch[0];
+                btCurrentVersion.textContent = version;
+
+                // Parse versions for comparison
+                const parseVersion = (v) => {
+                    const nums = v.replace('v', '').split('.').map(n => parseInt(n) || 0);
+                    return { major: nums[0] || 0, minor: nums[1] || 0, patch: nums[2] || 0 };
+                };
+
+                const current = parseVersion(version);
+                const latest = parseVersion(LATEST_VERSION);
+
+                // Send response back to micro:bit
+                const txCharacteristic = await bluetoothCharacteristic.service.getCharacteristic(UART_TX_CHARACTERISTIC_UUID);
+                const encoder = new TextEncoder();
+
+                if (current.major < latest.major || 
+                    (current.major === latest.major && current.minor < latest.minor) ||
+                    (current.major === latest.major && current.minor === latest.minor && current.patch < latest.patch)) {
+                    // Older version - notify update needed
+                    await txCharacteristic.writeValue(encoder.encode('update needed\n'));
+                    btUpdateStatus.textContent = 'UPDATE AVAILABLE';
+                    btUpdateStatus.style.color = '#ffaa00';
+                    showConnectStatus(`VERSION ${version} DETECTED. UPDATE TO ${LATEST_VERSION} RECOMMENDED`, 'info');
+                } else {
+                    // Up to date or newer
+                    btUpdateStatus.textContent = 'UP TO DATE';
+                    btUpdateStatus.style.color = '#00ff88';
+                    showConnectStatus(`VERSION ${version} DETECTED. YOU ARE UP TO DATE`, 'success');
+                }
+            }
         }
 
         async function checkVersion() {
@@ -558,7 +721,7 @@
                                 const text = new TextDecoder().decode(value);
                                 receivedData += text;
                                 
-                                // Check if we received version data (e.g., "v3" or "v0.1")
+                                // Check if we received version data (e.g., "v2" or "v0.1")
                                 const versionMatch = receivedData.match(/v\d+(\.\d+)?/);
                                 if (versionMatch) {
                                     clearTimeout(timeout);
@@ -799,6 +962,8 @@
         flashBtn.addEventListener('click', flashMicrobit);
         checkVersionBtn.addEventListener('click', checkVersion);
         updateBtn.addEventListener('click', updateMicroOS);
+        connectBtn.addEventListener('click', connectBluetooth);
+        disconnectBtn.addEventListener('click', disconnectBluetooth);
 
         // Check WebUSB support
         if (!navigator.usb) {
@@ -808,6 +973,11 @@
         // Check Web Serial support
         if (!navigator.serial) {
             showUpdateStatus('WEB SERIAL NOT SUPPORTED. PLEASE USE CHROME OR EDGE.', 'error');
+        }
+
+        // Check Web Bluetooth support
+        if (!navigator.bluetooth) {
+            showConnectStatus('WEB BLUETOOTH NOT SUPPORTED. PLEASE USE CHROME OR EDGE.', 'error');
         }
     </script>
 </body>

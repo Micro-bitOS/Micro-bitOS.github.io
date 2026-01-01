@@ -649,6 +649,7 @@
                 if (usb) {
                     try {
                         await usb.disconnect();
+                        await new Promise(resolve => setTimeout(resolve, 1000));
                     } catch (e) {
                         console.log('Disconnect error (ignoring):', e);
                     }
@@ -660,11 +661,8 @@
                 const connectionStatus = await usb.connect();
                 
                 if (connectionStatus !== 'CONNECTED') {
-                    throw new Error('FAILED TO CONNECT TO MICRO:BIT');
+                    throw new Error('FAILED TO CONNECT TO MICRO:BIT. TRY UNPLUGGING AND RECONNECTING YOUR MICRO:BIT');
                 }
-
-                // Small delay to ensure connection is stable
-                await new Promise(resolve => setTimeout(resolve, 500));
 
                 showUpdateStatus('CONNECTED. FETCHING UPDATE...', 'info');
                 updateUpdateProgress(30);
@@ -697,7 +695,21 @@
 
             } catch (error) {
                 console.error('Error:', error);
-                showUpdateStatus('ERROR: ' + error.message.toUpperCase(), 'error');
+                let errorMsg = error.message.toUpperCase();
+                
+                // Provide helpful error messages
+                if (errorMsg.includes('BAD RESPONSE')) {
+                    errorMsg = 'CONNECTION ERROR. TRY: 1) UNPLUG YOUR MICRO:BIT 2) WAIT 5 SECONDS 3) PLUG IT BACK IN 4) TRY AGAIN';
+                }
+                
+                showUpdateStatus('ERROR: ' + errorMsg, 'error');
+                
+                // Try to disconnect on error
+                if (usb) {
+                    try {
+                        await usb.disconnect();
+                    } catch (e) {}
+                }
             } finally {
                 updateBtn.disabled = false;
                 setTimeout(() => {
@@ -716,6 +728,7 @@
                 if (usb) {
                     try {
                         await usb.disconnect();
+                        await new Promise(resolve => setTimeout(resolve, 1000));
                     } catch (e) {
                         console.log('Disconnect error (ignoring):', e);
                     }
@@ -726,11 +739,8 @@
                 const connectionStatus = await usb.connect();
                 
                 if (connectionStatus !== 'CONNECTED') {
-                    throw new Error('FAILED TO CONNECT TO MICRO:BIT');
+                    throw new Error('FAILED TO CONNECT TO MICRO:BIT. TRY UNPLUGGING AND RECONNECTING YOUR MICRO:BIT');
                 }
-
-                // Small delay to ensure connection is stable
-                await new Promise(resolve => setTimeout(resolve, 500));
 
                 showStatus('CONNECTED. FETCHING HEX FILE...', 'info');
                 progressContainer.classList.add('show');
@@ -762,7 +772,21 @@
 
             } catch (error) {
                 console.error('Error:', error);
-                showStatus('ERROR: ' + error.message.toUpperCase(), 'error');
+                let errorMsg = error.message.toUpperCase();
+                
+                // Provide helpful error messages
+                if (errorMsg.includes('BAD RESPONSE')) {
+                    errorMsg = 'CONNECTION ERROR. TRY: 1) UNPLUG YOUR MICRO:BIT 2) WAIT 5 SECONDS 3) PLUG IT BACK IN 4) TRY AGAIN';
+                }
+                
+                showStatus('ERROR: ' + errorMsg, 'error');
+                
+                // Try to disconnect on error
+                if (usb) {
+                    try {
+                        await usb.disconnect();
+                    } catch (e) {}
+                }
             } finally {
                 flashBtn.disabled = false;
                 setTimeout(() => {

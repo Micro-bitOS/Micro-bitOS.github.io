@@ -645,17 +645,26 @@
                 updateProgressContainer.classList.add('show');
                 updateUpdateProgress(10);
 
-                // Create WebUSB connection
-                if (!usb) {
-                    usb = createWebUSBConnection();
+                // Disconnect and recreate WebUSB connection to ensure clean state
+                if (usb) {
+                    try {
+                        await usb.disconnect();
+                    } catch (e) {
+                        console.log('Disconnect error (ignoring):', e);
+                    }
                 }
+                usb = createWebUSBConnection();
 
                 // Connect to micro:bit
+                showUpdateStatus('CONNECTING TO MICRO:BIT...', 'info');
                 const connectionStatus = await usb.connect();
                 
                 if (connectionStatus !== 'CONNECTED') {
                     throw new Error('FAILED TO CONNECT TO MICRO:BIT');
                 }
+
+                // Small delay to ensure connection is stable
+                await new Promise(resolve => setTimeout(resolve, 500));
 
                 showUpdateStatus('CONNECTED. FETCHING UPDATE...', 'info');
                 updateUpdateProgress(30);
@@ -703,10 +712,15 @@
                 flashBtn.disabled = true;
                 showStatus('REQUESTING MICRO:BIT CONNECTION...', 'info');
 
-                // Create WebUSB connection
-                if (!usb) {
-                    usb = createWebUSBConnection();
+                // Disconnect and recreate WebUSB connection to ensure clean state
+                if (usb) {
+                    try {
+                        await usb.disconnect();
+                    } catch (e) {
+                        console.log('Disconnect error (ignoring):', e);
+                    }
                 }
+                usb = createWebUSBConnection();
 
                 // Connect to micro:bit
                 const connectionStatus = await usb.connect();
@@ -714,6 +728,9 @@
                 if (connectionStatus !== 'CONNECTED') {
                     throw new Error('FAILED TO CONNECT TO MICRO:BIT');
                 }
+
+                // Small delay to ensure connection is stable
+                await new Promise(resolve => setTimeout(resolve, 500));
 
                 showStatus('CONNECTED. FETCHING HEX FILE...', 'info');
                 progressContainer.classList.add('show');

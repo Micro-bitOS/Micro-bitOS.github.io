@@ -524,7 +524,19 @@
                 });
 
                 await serialPort.open({ baudRate: 115200 });
-                showUpdateStatus('CONNECTED. READING VERSION...', 'info');
+                showUpdateStatus('CONNECTED. PLEASE OPEN THE UPDATE APP ON YOUR MICRO:BIT', 'info');
+                
+                // Wait for user confirmation
+                const confirmed = confirm('Have you opened the Update app on your micro:bit?');
+                if (!confirmed) {
+                    await serialPort.close();
+                    serialPort = null;
+                    showUpdateStatus('OPERATION CANCELLED', 'error');
+                    checkVersionBtn.disabled = false;
+                    return;
+                }
+                
+                showUpdateStatus('READING VERSION...', 'info');
 
                 const reader = serialPort.readable.getReader();
                 let receivedData = '';

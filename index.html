@@ -362,7 +362,7 @@
 
         <div class="top-bar">
             <div class="tab active" data-tab="download">Download</div>
-            <div class="tab" data-tab="connect">Constant Connect</div>
+            <div class="tab" data-tab="settings">Settings</div>
             <div class="tab" data-tab="update">Update</div>
             <div class="tab" data-tab="apps">Apps</div>
         </div>
@@ -386,42 +386,36 @@
                 <div class="status" id="status"></div>
             </div>
 
-            <div class="section" id="connect">
+            <div class="section" id="settings">
                 <div style="width: 100%;">
-                    <h1>Constant Connect</h1>
-                    <div class="subtitle">MicroOS WiFi via Bluetooth</div>
+                    <h1>Settings</h1>
+                    <div class="subtitle">Configure Your Micro:bit</div>
                     
                     <div style="background: #1a1f3a; border: 2px solid #00ffff; padding: 20px; margin-bottom: 20px;">
                         <div style="color: #00ffff; font-size: 0.9em; line-height: 1.6; margin-bottom: 15px;">
-                            Connect your micro:bit via Bluetooth to enable constant communication. 
-                            The site will automatically check for version updates and notify you when available.
+                            First, open the Settings app on your micro:bit. Then connect via serial and configure the values below.
                         </div>
                     </div>
 
-                    <button class="download-btn" id="connectBtn" style="margin-bottom: 15px; padding: 15px 40px; font-size: 1em;">
-                        <span>[ CONNECT BLUETOOTH ]</span>
+                    <button class="download-btn" id="connectSerialBtn" style="margin-bottom: 20px; padding: 15px 40px; font-size: 1em;">
+                        <span>[ CONNECT SERIAL ]</span>
                     </button>
 
-                    <button class="download-btn" id="disconnectBtn" style="display: none; margin-bottom: 15px; padding: 15px 40px; font-size: 1em; border-color: #ff0055; color: #ff0055;">
-                        <span>[ DISCONNECT ]</span>
-                    </button>
-
-                    <div style="background: #1a1f3a; border: 2px solid #00ffff; padding: 20px; display: none;" id="connectionInfo">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                            <div style="color: #00ffff; font-size: 0.9em;">CONNECTION STATUS:</div>
-                            <div id="connectionStatus" style="color: #00ff88; font-size: 0.9em; font-weight: bold;">CONNECTED</div>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                            <div style="color: #00ffff; font-size: 0.9em;">CURRENT VERSION:</div>
-                            <div id="btCurrentVersion" style="color: #00ff88; font-size: 0.9em; font-weight: bold;">-</div>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div style="color: #00ffff; font-size: 0.9em;">UPDATE STATUS:</div>
-                            <div id="btUpdateStatus" style="color: #00ff88; font-size: 0.9em; font-weight: bold;">UP TO DATE</div>
+                    <div style="background: #1a1f3a; border: 2px solid #00ffff; padding: 20px; display: none;" id="settingsPanel">
+                        <div style="margin-bottom: 25px;">
+                            <div style="color: #00ffff; font-size: 1em; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px;">
+                                MUTE
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 15px;">
+                                <label style="display: flex; align-items: center; cursor: pointer;">
+                                    <input type="checkbox" id="muteToggle" style="width: 20px; height: 20px; cursor: pointer;">
+                                    <span style="color: #00ffff; margin-left: 10px; font-size: 0.9em;" id="muteLabel">OFF</span>
+                                </label>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="status" id="connectStatus"></div>
+                    <div class="status" id="settingsStatus"></div>
                 </div>
             </div>
 
@@ -519,20 +513,16 @@
         const updateProgressContainer = document.getElementById('updateProgressContainer');
         const updateProgressFill = document.getElementById('updateProgressFill');
 
-        // Constant Connect elements
-        const connectBtn = document.getElementById('connectBtn');
-        const disconnectBtn = document.getElementById('disconnectBtn');
-        const connectionInfo = document.getElementById('connectionInfo');
-        const connectionStatus = document.getElementById('connectionStatus');
-        const btCurrentVersion = document.getElementById('btCurrentVersion');
-        const btUpdateStatus = document.getElementById('btUpdateStatus');
-        const connectStatus = document.getElementById('connectStatus');
+        // Settings elements
+        const connectSerialBtn = document.getElementById('connectSerialBtn');
+        const settingsPanel = document.getElementById('settingsPanel');
+        const muteToggle = document.getElementById('muteToggle');
+        const muteLabel = document.getElementById('muteLabel');
+        const settingsStatus = document.getElementById('settingsStatus');
 
         let usb = null;
         let serialPort = null;
-        let bluetoothDevice = null;
-        let bluetoothServices = null;
-        let isConnected = false;
+        let isSerialConnected = false;
         const LATEST_VERSION = 'v3';
 
         // Tab switching
@@ -558,9 +548,9 @@
             updateStatus.className = 'status show ' + type;
         }
 
-        function showConnectStatus(message, type) {
-            connectStatus.textContent = '▶ ' + message;
-            connectStatus.className = 'status show ' + type;
+        function showSettingsStatus(message, type) {
+            settingsStatus.textContent = '▶ ' + message;
+            settingsStatus.className = 'status show ' + type;
         }
 
         function updateProgress(percent) {
@@ -571,124 +561,67 @@
             updateProgressFill.style.width = percent + '%';
         }
 
-        async function connectBluetooth() {
+        async function connectSerial() {
             try {
-                connectBtn.disabled = true;
-                showConnectStatus('REQUESTING BLUETOOTH DEVICE...', 'info');
+                connectSerialBtn.disabled = true;
+                showSettingsStatus('REQUESTING SERIAL PORT...', 'info');
 
-                // Use the proper microbit-web-bluetooth library
-                bluetoothDevice = await requestMicrobit(navigator.bluetooth);
+                // Request serial port
+                serialPort = await navigator.serial.requestPort({
+                    filters: [{ usbVendorId: 0x0d28 }]
+                });
+
+                await serialPort.open({ baudRate: 115200 });
+                showSettingsStatus('SERIAL CONNECTED. READY TO CONFIGURE.', 'success');
                 
-                if (!bluetoothDevice) {
-                    showConnectStatus('NO DEVICE SELECTED', 'error');
-                    connectBtn.disabled = false;
-                    return;
-                }
-
-                showConnectStatus('DEVICE SELECTED. GETTING SERVICES...', 'info');
-                bluetoothServices = await getServices(bluetoothDevice);
-                
-                if (!bluetoothServices || !bluetoothServices.uartService) {
-                    showConnectStatus('ERROR: NO UART SERVICE FOUND. MAKE SURE YOUR MICRO:BIT HAS UART ENABLED', 'error');
-                    bluetoothDevice.gatt.disconnect();
-                    bluetoothDevice = null;
-                    bluetoothServices = null;
-                    connectBtn.disabled = false;
-                    return;
-                }
-
-                // Listen for UART data
-                showConnectStatus('SETTING UP DATA LISTENER...', 'info');
-                bluetoothServices.uartService.addEventListener('receiveText', handleBluetoothData);
-
-                // Handle disconnect
-                bluetoothDevice.addEventListener('gattserverdisconnected', handleDisconnect);
-
-                isConnected = true;
-                connectBtn.style.display = 'none';
-                disconnectBtn.style.display = 'block';
-                connectionInfo.style.display = 'block';
-                connectionStatus.textContent = 'CONNECTED';
-                connectionStatus.style.color = '#00ff88';
-                showConnectStatus('BLUETOOTH CONNECTED. LISTENING FOR VERSION DATA...', 'success');
+                connectSerialBtn.style.display = 'none';
+                settingsPanel.style.display = 'block';
+                isSerialConnected = true;
 
             } catch (error) {
-                console.error('Bluetooth error:', error);
+                console.error('Serial error:', error);
                 let errorMsg = 'ERROR: ';
                 
                 if (error.name === 'NotFoundError') {
-                    errorMsg += 'NO MICRO:BIT DEVICE FOUND. MAKE SURE YOUR MICRO:BIT IS POWERED ON AND IN BLUETOOTH RANGE';
+                    errorMsg += 'NO SERIAL PORT FOUND';
                 } else if (error.name === 'SecurityError') {
-                    errorMsg += 'BLUETOOTH NOT ALLOWED. MAKE SURE YOU ARE ON HTTPS OR LOCALHOST';
-                } else if (error.name === 'NetworkError') {
-                    errorMsg += 'CONNECTION FAILED. TRY RESETTING YOUR MICRO:BIT';
+                    errorMsg += 'SERIAL NOT ALLOWED. MAKE SURE YOU ARE ON HTTPS OR LOCALHOST';
                 } else {
                     errorMsg += error.message.toUpperCase();
                 }
                 
-                showConnectStatus(errorMsg, 'error');
-                connectBtn.disabled = false;
+                showSettingsStatus(errorMsg, 'error');
+                connectSerialBtn.disabled = false;
             }
         }
 
-        async function disconnectBluetooth() {
-            if (bluetoothDevice && bluetoothDevice.gatt.connected) {
-                await bluetoothDevice.gatt.disconnect();
+        async function sendSerialCommand(command) {
+            if (!serialPort || !isSerialConnected) {
+                showSettingsStatus('NOT CONNECTED TO SERIAL PORT', 'error');
+                return;
             }
-            handleDisconnect();
-        }
 
-        function handleDisconnect() {
-            isConnected = false;
-            connectBtn.style.display = 'block';
-            connectBtn.disabled = false;
-            disconnectBtn.style.display = 'none';
-            connectionInfo.style.display = 'none';
-            connectionStatus.textContent = 'DISCONNECTED';
-            connectionStatus.style.color = '#ff0055';
-            btCurrentVersion.textContent = '-';
-            btUpdateStatus.textContent = '-';
-            bluetoothDevice = null;
-            bluetoothServices = null;
-            showConnectStatus('BLUETOOTH DISCONNECTED', 'info');
-        }
-
-        function handleBluetoothData(event) {
-            const receivedText = event.detail.trim();
-
-            console.log('Received:', receivedText);
-
-            // Check if it's a version message (e.g., "v3" or "v0.1")
-            const versionMatch = receivedText.match(/v\d+(\.\d+)?/);
-            if (versionMatch) {
-                const version = versionMatch[0];
-                btCurrentVersion.textContent = version;
-
-                // Parse versions for comparison
-                const parseVersion = (v) => {
-                    const nums = v.replace('v', '').split('.').map(n => parseInt(n) || 0);
-                    return { major: nums[0] || 0, minor: nums[1] || 0, patch: nums[2] || 0 };
-                };
-
-                const current = parseVersion(version);
-                const latest = parseVersion(LATEST_VERSION);
-
-                if (current.major < latest.major || 
-                    (current.major === latest.major && current.minor < latest.minor) ||
-                    (current.major === latest.major && current.minor === latest.minor && current.patch < latest.patch)) {
-                    // Older version - notify update needed
-                    bluetoothServices.uartService.sendText('update needed\n');
-                    btUpdateStatus.textContent = 'UPDATE AVAILABLE';
-                    btUpdateStatus.style.color = '#ffaa00';
-                    showConnectStatus(`VERSION ${version} DETECTED. UPDATE TO ${LATEST_VERSION} RECOMMENDED`, 'info');
-                } else {
-                    // Up to date or newer
-                    btUpdateStatus.textContent = 'UP TO DATE';
-                    btUpdateStatus.style.color = '#00ff88';
-                    showConnectStatus(`VERSION ${version} DETECTED. YOU ARE UP TO DATE`, 'success');
-                }
+            try {
+                const writer = serialPort.writable.getWriter();
+                const encoder = new TextEncoder();
+                await writer.write(encoder.encode(command + '\n'));
+                writer.releaseLock();
+            } catch (error) {
+                console.error('Error sending command:', error);
+                showSettingsStatus('ERROR SENDING COMMAND: ' + error.message.toUpperCase(), 'error');
             }
         }
+
+        muteToggle.addEventListener('change', async () => {
+            const isMuted = muteToggle.checked;
+            const command = isMuted ? 'setmuteon' : 'setmuteoff';
+            
+            showSettingsStatus(`SENDING: ${command.toUpperCase()}...`, 'info');
+            await sendSerialCommand(command);
+            
+            muteLabel.textContent = isMuted ? 'ON' : 'OFF';
+            showSettingsStatus(`MUTE ${isMuted ? 'ENABLED' : 'DISABLED'}`, 'success');
+        });
 
         async function checkVersion() {
             try {
@@ -976,8 +909,7 @@
         flashBtn.addEventListener('click', flashMicrobit);
         checkVersionBtn.addEventListener('click', checkVersion);
         updateBtn.addEventListener('click', updateMicroOS);
-        connectBtn.addEventListener('click', connectBluetooth);
-        disconnectBtn.addEventListener('click', disconnectBluetooth);
+        connectSerialBtn.addEventListener('click', connectSerial);
 
         // Check WebUSB support
         if (!navigator.usb) {
@@ -987,11 +919,6 @@
         // Check Web Serial support
         if (!navigator.serial) {
             showUpdateStatus('WEB SERIAL NOT SUPPORTED. PLEASE USE CHROME OR EDGE.', 'error');
-        }
-
-        // Check Web Bluetooth support
-        if (!navigator.bluetooth) {
-            showConnectStatus('WEB BLUETOOTH NOT SUPPORTED. PLEASE USE CHROME OR EDGE.', 'error');
         }
     </script>
 </body>

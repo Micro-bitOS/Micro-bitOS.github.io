@@ -585,7 +585,7 @@
                 connectBtn.disabled = true;
                 showConnectStatus('REQUESTING BLUETOOTH DEVICE...', 'info');
 
-                // Request micro:bit device
+                // Simple filter - just like all the GitHub examples
                 bluetoothDevice = await navigator.bluetooth.requestDevice({
                     filters: [{ namePrefix: 'BBC micro:bit' }],
                     optionalServices: [UART_SERVICE_UUID]
@@ -597,7 +597,7 @@
                 showConnectStatus('CONNECTED. GETTING UART SERVICE...', 'info');
                 const service = await server.getPrimaryService(UART_SERVICE_UUID);
                 
-                showConnectStatus('SERVICE FOUND. GETTING TX CHARACTERISTIC...', 'info');
+                showConnectStatus('SERVICE FOUND. SETTING UP NOTIFICATIONS...', 'info');
                 // Get TX characteristic (micro:bit transmits, we receive - this one notifies us)
                 const txCharacteristic = await service.getCharacteristic(UART_TX_CHARACTERISTIC_UUID);
 
@@ -624,12 +624,12 @@
                 console.error('Bluetooth error:', error);
                 let errorMsg = 'ERROR: ';
                 
-                if (error.name === 'NetworkError') {
-                    errorMsg += 'CONNECTION FAILED. MAKE SURE: 1) BLUETOOTH UART SERVICE IS RUNNING ON MICRO:BIT 2) "NO PAIRING REQUIRED" IS ENABLED IN PROJECT SETTINGS';
-                } else if (error.name === 'NotFoundError') {
-                    errorMsg += 'UART SERVICE NOT FOUND. DID YOU ENABLE BLUETOOTH UART SERVICE?';
+                if (error.name === 'NotFoundError') {
+                    errorMsg += 'NO SERVICE FOUND. MAKE SURE BLUETOOTH UART SERVICE IS RUNNING ON YOUR MICRO:BIT';
                 } else if (error.name === 'SecurityError') {
                     errorMsg += 'BLUETOOTH NOT ALLOWED. MAKE SURE YOU ARE ON HTTPS OR LOCALHOST';
+                } else if (error.name === 'NetworkError') {
+                    errorMsg += 'CONNECTION FAILED. TRY RESETTING YOUR MICRO:BIT';
                 } else {
                     errorMsg += error.message.toUpperCase();
                 }

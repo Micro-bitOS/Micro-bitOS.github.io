@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BLE UART Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0e27;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            color: #00ffff;
+        }
+
+        .container {
+            background: #0f1429;
+            border: 2px solid #00ffff;
+            max-width: 800px;
+            width: 100%;
+            box-shadow: 0 0 40px rgba(0, 255, 255, 0.3);
+            padding: 40px;
+            border-radius: 5px;
+        }
+
+        h1 {
+            color: #00ffff;
+            text-align: center;
+            margin-bottom: 30px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        }
+
+        .section {
+            margin-bottom: 30px;
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            padding: 20px;
+            background: rgba(0, 255, 255, 0.05);
+        }
+
+        .section-title {
+            color: #00ff88;
+            font-size: 1em;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        button {
+            background: transparent;
+            color: #00ffff;
+            border: 2px solid #00ffff;
+            padding: 10px 20px;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: 'Courier New', monospace;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        button:hover:not(:disabled) {
+            background: rgba(0, 255, 255, 0.1);
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.5);
+            transform: translateY(-2px);
+        }
+
+        button:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            border-color: #666;
+            color: #666;
+            cursor: not-allowed;
+        }
+
+        .status {
+            padding: 15px;
+            border-left: 4px solid;
+            margin-bottom: 15px;
+            display: none;
+        }
+
+        .status.show {
+            display: block;
+        }
+
+        .status.info {
+            border-color: #00ffff;
+            color: #00ffff;
+            background: rgba(0, 255, 255, 0.05);
+        }
+
+        .status.success {
+            border-color: #00ff88;
+            color: #00ff88;
+            background: rgba(0, 255, 136, 0.05);
+        }
+
+        .status.error {
+            border-color: #ff0055;
+            color: #ff0055;
+            background: rgba(255, 0, 85, 0.05);
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            align-items: flex-start;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            background: #1a1f3a;
+            border: 1px solid #00ffff;
+            color: #00ffff;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        input[type="text"]::placeholder {
+            color: #00ffff;
+            opacity: 0.5;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        }
+
+        .log {
+            background: #000;
+            border: 1px solid #00ffff;
+            padding: 15px;
+            height: 400px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+            font-size: 0.85em;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            line-height: 1.4;
+        }
+
+        .log-entry.sent {
+            color: #00ff88;
+        }
+
+        .log-entry.received {
+            color: #00ffff;
+        }
+
+        .log-entry.system {
+            color: #ffaa00;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ff0055;
+            display: inline-block;
+        }
+
+        .status-indicator.connected {
+            background: #00ff88;
+            box-shadow: 0 0 10px #00ff88;
+        }
+
+        .clear-btn {
+            border-color: #ff0055;
+            color: #ff0055;
+        }
+
+        .clear-btn:hover:not(:disabled) {
+            background: rgba(255, 0, 85, 0.1);
+            box-shadow: 0 0 15px rgba(255, 0, 85, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>[ BLE UART TEST ]</h1>
+
+        <div class="section">
+            <div class="section-title">Connection</div>
+            <div class="connection-status">
+                <div class="status-indicator" id="statusIndicator"></div>
+                <span id="connectionStatus">DISCONNECTED</span>
+            </div>
+            <button id="connectBtn">[ CONNECT ]</button>
+            <button id="disconnectBtn" disabled>[ DISCONNECT ]</button>
+            <div class="status" id="connectionMessage"></div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">UART Console</div>
+            <div class="log" id="uartLog"></div>
+            <button class="clear-btn" id="clearBtn">[ CLEAR LOG ]</button>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Send Message</div>
+            <div class="input-group">
+                <input type="text" id="messageInput" placeholder="Enter message..." disabled>
+                <button id="sendBtn" disabled>[ SEND ]</button>
+            </div>
+            <div style="font-size: 0.8em; color: rgba(0, 255, 255, 0.7);">
+                Messages are automatically sent with newline character
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { requestMicrobit, getServices } from 'https://cdn.jsdelivr.net/npm/microbit-web-bluetooth@latest/+esm';
+
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const sendBtn = document.getElementById('sendBtn');
+        const messageInput = document.getElementById('messageInput');
+        const clearBtn = document.getElementById('clearBtn');
+        const uartLog = document.getElementById('uartLog');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const connectionMessage = document.getElementById('connectionMessage');
+
+        let bluetoothDevice = null;
+        let bluetoothServices = null;
+        let isConnected = false;
+
+        function addLogEntry(message, type = 'system') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            uartLog.appendChild(entry);
+            uartLog.scrollTop = uartLog.scrollHeight;
+        }
+
+        function showConnectionMessage(message, type) {
+            const msg = document.getElementById('connectionMessage');
+            msg.textContent = '▶ ' + message;
+            msg.className = 'status show ' + type;
+        }
+
+        function updateConnectionUI(connected) {
+            isConnected = connected;
+            connectBtn.disabled = connected;
+            disconnectBtn.disabled = !connected;
+            messageInput.disabled = !connected;
+            sendBtn.disabled = !connected;
+
+            if (connected) {
+                connectionStatus.textContent = 'CONNECTED';
+                statusIndicator.classList.add('connected');
+                addLogEntry('BLE Connected successfully', 'system');
+                showConnectionMessage('CONNECTED TO MICRO:BIT', 'success');
+            } else {
+                connectionStatus.textContent = 'DISCONNECTED';
+                statusIndicator.classList.remove('connected');
+                addLogEntry('BLE Disconnected', 'system');
+                showConnectionMessage('DISCONNECTED FROM MICRO:BIT', 'info');
+            }
+        }
+
+        async function connect() {
+            try {
+                connectBtn.disabled = true;
+                addLogEntry('Requesting device...', 'system');
+                showConnectionMessage('REQUESTING BLUETOOTH DEVICE...', 'info');
+
+                bluetoothDevice = await requestMicrobit(navigator.bluetooth);
+
+                if (!bluetoothDevice) {
+                    showConnectionMessage('NO DEVICE SELECTED', 'error');
+                    addLogEntry('Device selection cancelled', 'system');
+                    connectBtn.disabled = false;
+                    return;
+                }
+
+                addLogEntry(`Device selected: ${bluetoothDevice.name}`, 'system');
+                showConnectionMessage('DEVICE SELECTED. GETTING SERVICES...', 'info');
+
+                bluetoothServices = await getServices(bluetoothDevice);
+
+                if (!bluetoothServices || !bluetoothServices.uartService) {
+                    showConnectionMessage('ERROR: NO UART SERVICE FOUND', 'error');
+                    addLogEntry('UART service not found on device', 'system');
+                    bluetoothDevice.gatt.disconnect();
+                    bluetoothDevice = null;
+                    bluetoothServices = null;
+                    connectBtn.disabled = false;
+                    return;
+                }
+
+                addLogEntry('UART Service found', 'system');
+                showConnectionMessage('SETTING UP UART LISTENER...', 'info');
+
+                // Listen for UART data
+                bluetoothServices.uartService.addEventListener('receiveText', handleUARTData);
+
+                // Handle disconnect
+                bluetoothDevice.addEventListener('gattserverdisconnected', () => {
+                    addLogEntry('Device disconnected unexpectedly', 'system');
+                    updateConnectionUI(false);
+                });
+
+                updateConnectionUI(true);
+
+            } catch (error) {
+                console.error('Connection error:', error);
+                let errorMsg = error.message || error.toString();
+                addLogEntry(`Error: ${errorMsg}`, 'system');
+                showConnectionMessage(`ERROR: ${errorMsg.toUpperCase()}`, 'error');
+                connectBtn.disabled = false;
+            }
+        }
+
+        async function disconnect() {
+            try {
+                disconnectBtn.disabled = true;
+                addLogEntry('Disconnecting...', 'system');
+
+                if (bluetoothDevice && bluetoothDevice.gatt.connected) {
+                    await bluetoothDevice.gatt.disconnect();
+                }
+
+                bluetoothDevice = null;
+                bluetoothServices = null;
+                updateConnectionUI(false);
+
+            } catch (error) {
+                console.error('Disconnect error:', error);
+                addLogEntry(`Disconnect error: ${error.message}`, 'system');
+                disconnectBtn.disabled = false;
+            }
+        }
+
+        function handleUARTData(event) {
+            const data = event.detail;
+            const displayData = data.replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+            addLogEntry(`RX: ${displayData}`, 'received');
+        }
+
+        async function sendMessage() {
+            if (!isConnected || !bluetoothServices) {
+                addLogEntry('Not connected to device', 'system');
+                return;
+            }
+
+            const message = messageInput.value;
+            if (!message) {
+                return;
+            }
+
+            try {
+                sendBtn.disabled = true;
+                const displayMessage = message.replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+                addLogEntry(`TX: ${displayMessage}`, 'sent');
+
+                await bluetoothServices.uartService.sendText(message + '\n');
+                messageInput.value = '';
+
+            } catch (error) {
+                console.error('Send error:', error);
+                addLogEntry(`Error sending: ${error.message}`, 'system');
+            } finally {
+                sendBtn.disabled = false;
+                messageInput.focus();
+            }
+        }
+
+        function clearLog() {
+            uartLog.innerHTML = '';
+            addLogEntry('Log cleared', 'system');
+        }
+
+        // Event listeners
+        connectBtn.addEventListener('click', connect);
+        disconnectBtn.addEventListener('click', disconnect);
+        sendBtn.addEventListener('click', sendMessage);
+        clearBtn.addEventListener('click', clearLog);
+
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !sendBtn.disabled) {
+                sendMessage();
+            }
+        });
+
+        // Initial status
+        addLogEntry('BLE UART Tester Ready', 'system');
+
+        // Check Web Bluetooth support
+        if (!navigator.bluetooth) {
+            showConnectionMessage('WEB BLUETOOTH NOT SUPPORTED. PLEASE USE CHROME OR EDGE.', 'error');
+            addLogEntry('Web Bluetooth API not available', 'system');
+        }
+    </script>
+</body>
+</html>
